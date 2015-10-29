@@ -17,6 +17,11 @@
 BrokerConnectionManager::BrokerConnectionManager(std::string hostName,
         std::string btp,int bport)
 {
+    if ( ! btp.size() || btp[btp.size() - 1] != '/' )
+	btp += "/";
+
+    btp += "host/" + hostName;
+
     //initialize broker API
     broker::init();
     this->b_port = bport;
@@ -92,9 +97,9 @@ bool BrokerConnectionManager::getAndSetTopic()
 {
     //get topic form message queue
     std::string temp = qm->getBrokerTopic(this->ptpfd,connected);
-    delete this->ptmq;
-    this->ptmq = NULL;
-    this->ptmq = new broker::message_queue(temp,*ptlocalhost);
+    //delete this->ptmq;
+    //this->ptmq = NULL;
+    // this->ptmq = new broker::message_queue(temp,*ptlocalhost);
     delete this->ptpfd;
     // pooling for message queue
     ptpfd = new pollfd{this->ptmq->fd(), POLLIN, 0};
