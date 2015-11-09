@@ -9,6 +9,33 @@
  *
  */
 
+/*State Machine Table:
+
+       |PARAM_READ_   |CONNECTION	|TOPIC_RECEIVED |HOST	        |HOST_SUBSCRIBE |HOST	  |HOST	    |SIG	     |CONNECTION   |TIMER       |
+       |EVENT         |_ESTABLISHED	|	    |_SUBSCRIBE     |_END	|_UNSUBSCRIBE |_UNSUBSCRIBE |_KILL	     |_BROKEN      |_EVENT      |
+       |	          |		|	    |	        |		|	  |_END	    |	     |	       |	        |
+-------|--------------|-------------|---------------|---------------|---------------|-------------|-------------|------------|-------------|------------|
+INIT   |pass control  |N-S--->WAIT_	|illegitmate    |illegitimate   |illegitmate 	|illegitmate  |illegitmate  |free the    |free the     |stop-timer  |
+       |to connection |_FOR_TOPIC	|event	    |event	        |event	|event	  |event	    |resources   |resources    |	        |
+       |establishment |		|	    |	        |		|	  |	    |and exit    |N-S----->INIT|	        |
+       |	          |		|	    |	        |		|	  |	    |gracefully  |	       |	        |
+------ |--------------|-------------|---------------|---------------|---------------|-------------|-------------|------------|-------------|------------|
+WAIT   |illegitimate  |illegitimate	|extract and    |send warning   |send_warning	|send_warning |send_warning |illegitimate|illegitimate |illegitimate|	
+_FOR   |event         |event	|process topic  |to Broside     |to Broside	|to Broside	  |to Broside   |event	     |event	       |event       |
+_TOPIC |	          |		|N-S-->GET_AND_ |	        |		|	  |	    |	     |	       |	        |
+       |	          |		|PROCESS_QUERIES|	        |		|	  |	    |	     |	       |	        |
+-------|--------------|-------------|---------------|---------------|---------------|-------------|-------------|------------|-------------|------------|
+GET    |illegitmate   |illegitmate	|send warning   |add new query  |process queries|delete given |process 	    |illegitimate|illegitmate  |track       |
+_AND_  |event         |event	|to Bro-side    |to local vector|and build 	|sql query    |queries and  |event	     |event	       |changes     |
+PROCESS|	          |		|	    |	        | vector	|from local   |build vector |	     |	       |and send    |
+_QUER  |	          |		|	    |	        |with updated	|vector	  |with updated |	     |	       |updates     |
+IES    |	          |		|	    |	        |values	|	  |values	    |	     |	       |to Broside  |
+-------|--------------|-------------|---------------|---------------|---------------|-------------|-------------|------------|-------------|------------|
+TERMI- |illegitimate  |illegitimate	|illegitmate    |illegitimate   |illegitimate	|illegitimate |illegitimate |illegitimate|illegitimate |illegitimate|
+NATE   |event         |event	|event	    |event	        |event	| event	  |event	    |event	     |event	       |event       |
+
+*/
+
 #pragma once
 
 
