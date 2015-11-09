@@ -24,7 +24,7 @@ BrokerConnectionManager::BrokerConnectionManager(std::string hostName,
 
     //initialize broker API
     broker::init();
-    this->b_port = bport;
+    this->bPort = bport;
     this->connected = false;
     //local host object
     this->ptlocalhost = new broker::endpoint(hostName);
@@ -48,38 +48,18 @@ BrokerConnectionManager::~BrokerConnectionManager()
     delete this->ptmq;
 }
 
-bool BrokerConnectionManager::listenForBrokerConnection()
-{
-    LOG(WARNING) <<"listening for new Connection";
-    this->connected = false;
-    //listen for new connection. wait until at-least one connection is found
-    ptlocalhost->listen(b_port,getLocalHostIp().c_str());
-    //pop new connection request
-    auto conn_status = 
-    this->ptlocalhost->incoming_connection_status().need_pop();
-    for(auto cs: conn_status)
-    {
-        if(cs.status == broker::incoming_connection_status::tag::established)
-        {
-            LOG(WARNING) <<"Connection Established"<<std::endl;
-            this->connected = true;
-            break;
-        }
-    }
-    return this->connected;
-}
-
 bool BrokerConnectionManager::connectToMaster(std::string master_ip,
         std::chrono::duration<double> retry_interval, SignalHandler* handler)
 {
     LOG(WARNING) <<"Connecting to Master at "<<master_ip ;
     this->connected = false;
-    this->peer = ptlocalhost->peer(master_ip,b_port);
+    this->peer = ptlocalhost->peer(master_ip,bPort);
     
-    while(!connected && !handler->gotExitSignal())
+    while(!connected && !(handler->gotExitSignal()))
     {
         auto conn_status = 
         this->ptlocalhost->outgoing_connection_status().want_pop();
+
         for(auto cs: conn_status)
         {
             if(cs.status == broker::outgoing_connection_status::tag::established)
@@ -93,32 +73,31 @@ bool BrokerConnectionManager::connectToMaster(std::string master_ip,
     return (!handler->gotExitSignal())? true: false;
 }
 
-bool BrokerConnectionManager::getAndSetTopic()
-{
-    //get topic form message queue
-    std::string temp = qm->getBrokerTopic(this->ptpfd,connected);
-    //delete this->ptmq;
-    //this->ptmq = NULL;
-    // this->ptmq = new broker::message_queue(temp,*ptlocalhost);
+int BrokerConnectionManager::getAndSetTopic(std::string gTopic)
+{ 
+   
     delete this->ptpfd;
     // pooling for message queue
     ptpfd = new pollfd{this->ptmq->fd(), POLLIN, 0};
     delete this->qm;
     this->qm = NULL;
-    this->qm = new BrokerQueryManager(ptlocalhost,ptmq,temp);
+    this->qm = new BrokerQueryManager(ptlocalhost,ptmq,gTopic);
     
+    //send ready event to bro-side
     qm->sendReadytoBro();
+    
+    return (this->isConnectionAlive())?1:0;
 }
 
-bool BrokerConnectionManager::getAndProcessQuery()
+bool BrokerConnectionManager::processQueriesVectors()
 {
-    //get queries form message queue
-    bool temp = qm->getQueriesFromBrokerMessage(this->ptpfd,connected);
-    //if success
+    //get the state of in_query_vector whether empty or not.
+    bool temp = qm->getInQueryVectorStatus();
+    //if not of empty
     if(temp)
     {
         //then extract columns form query strings
-      temp = qm->queryColumnExtractor();
+        temp = qm->queryColumnExtractor();
     }
     else
     {
@@ -129,22 +108,30 @@ bool BrokerConnectionManager::getAndProcessQuery()
         this->connected = false;
         return false;
     }
-    // extract event add/removed form event part if success
+    // extract event add/removed/both form event part if success
     if(qm->getEventsFromBrokerMessage())
     {
         // then fill the out_query_vector with query data
         temp = qm->queryDataResultVectorInit();
     }
+    else
+    {
+        qm->sendErrortoBro("* is unexpected write columns instead");
+    }
     return temp;
 }
 
-void BrokerConnectionManager::trackResponseChangesAndSendResponseToMaster(
+int BrokerConnectionManager::trackResponseChangesAndSendResponseToMaster(
                     SignalHandler *handle)
 {
+    int local;
     //send a pointer to signal handler object created in main.cpp
     qm->setSignalHandle(handle);
     // start tracking updates
     qm->queriesUpdateTrackingHandler();
+    //check for new subscription messages
+    //local = qm->getLaterSubscriptionEvents(ptpfd,&peer);
+    return SUCCESS;
 }
 
 
@@ -173,6 +160,16 @@ bool BrokerConnectionManager::isConnectionAlive()
 BrokerQueryManager* BrokerConnectionManager::getQueryManagerPointer()
 {
     return this->qm;
+}
+
+pollfd* BrokerConnectionManager::getPollfdPointer()
+{
+    return this->ptpfd;
+}
+
+broker::message_queue* BrokerConnectionManager::getMessageQueuePointer()
+{
+ return this->ptmq;   
 }
 
 void BrokerConnectionManager::closeBrokerConnection()

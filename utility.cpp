@@ -57,7 +57,7 @@ void SignalHandler::setExitSignal(bool _bExitSignal)
 FileReader::FileReader()
 {
     //initialize kPath with the file directory 
-    this->kPath = "/var/osquery/broker.ini";
+    kPath = "/var/osquery/broker.ini";
 }
 
 int FileReader::read()
@@ -73,7 +73,7 @@ int FileReader::read()
         //if file not empty
         if(s.ok())
         {
-            std::string temp[5];
+            std::string temp[6];
             //split into lines
             auto strings = osquery::split(content,"\n");
             for(int i=0; i<strings.size();i++)
@@ -83,21 +83,22 @@ int FileReader::read()
                 temp[i] = sp[1].substr(1,sp[1].size()-2);  
             }
             //assign values to hostName, broker-topic and broker_port
-            this->hostName = temp[0];
-            this->b_topic = temp[1];
-            this->br_port = temp[2];
-            this->master_ip = temp[3];
-            this->retry_interval = temp[4];
+            hostName = temp[0];
+            bTopic = temp[1];
+            brPort = temp[2];
+            masterIP = temp[3];
+            retryInterval = temp[4];
+            timerInterval = temp[5];
         }
         else
         {
-            std::cerr << "Error reading file";
+            LOG(ERROR) << "Error reading file";
             return s.getCode();
         }
     }
     else
     {
-        std::cerr << "The Path does not exists";
+        LOG(ERROR) << "The Path does not exists";
         return 1;
     }
     return 0;
@@ -106,32 +107,35 @@ int FileReader::read()
 std::string FileReader::getHostName()
 {
     //return local host name
-    return this->hostName;
+    return hostName;
 }
 
 std::string FileReader::getBrokerTopic()
 {
     //return broker_topic in string form
-    return this->b_topic;
+    return bTopic;
 }
 
 std::string FileReader::getBrokerConnectionPort()
 {
     //return broker port in string form
-    return this->br_port;
+    return brPort;
 }
 
 std::string FileReader::getMasterIp()
 {
-    return this->master_ip;
+    return masterIP;
 }
 
 std::string FileReader::getRetryInterval()
 {
-    return this->retry_interval;
+    return retryInterval;
 }
 
-
+std::string FileReader::getTimerInterval()
+{
+    return timerInterval;
+}
 
 /*
  * End of FileReader Class member functions
